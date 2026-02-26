@@ -1,52 +1,24 @@
+import yt_dlp
 import pandas as pd
-from googleapiclient.discovery import build
-import os
-from datetime import date
 
-# --- CONFIG ---
-API_KEY = "AIzaSyCT7KxgmkHQW3cvTdddDlQJYtKN3ohhmdg"
-VIDEO_IDS = ["FN2CdB60yZw"]  # Add more video IDs here
-CSV_FILE = "data/youtube.csv"
+def scrape_youtube_video(url):
+    ydl_opts = {"quiet": True, "skip_download": True}
+    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+        info = ydl.extract_info(url, download=False)
 
-os.makedirs("data", exist_ok=True)
+    return {
+        "title": info.get("title"),
+        "views": info.get("view_count"),
+        "publish_date": info.get("upload_date"),
+        "channel": info.get("uploader"),
+        "url": url
+    }
 
-# --- BUILD API CLIENT ---
-youtube = build('youtube', 'v3', developerKey=API_KEY)
+urls = open("url/youtube_url.txt").read().splitlines()
+data = []
 
-rows = []
+for url in urls:
+    data.append(scrape_youtube_video(url))
 
-for video_id in VIDEO_IDS:
-    request = youtube.videos().list(
-        part="snippet,statistics",
-        id=video_id
-    )
-    response = request.execute()
-    
-    if response["items"]:
-        item = response["items"][0]
-        title = item["snippet"]["title"]
-        views = int(item["statistics"].get("viewCount", 0))
-        likes = int(item["statistics"].get("likeCount", 0))
-        publish_date = item["snippet"]["publishedAt"][:10]
-
-        rows.append({
-            "date": str(date.today()),
-            "video_id": video_id,
-            "title": title,
-            "views": views,
-            "likes": likes,
-            "publish_date": publish_date
-        })
-    else:
-        print(f"No data for video: {video_id}")
-
-# --- SAVE TO CSV ---
-if os.path.exists(CSV_FILE):
-    df_existing = pd.read_csv(CSV_FILE)
-    df = pd.concat([df_existing, pd.DataFrame(rows)], ignore_index=True)
-else:
-    df = pd.DataFrame(rows)
-
-df.to_csv(CSV_FILE, index=False)
-print("✅ YouTube data saved to CSV")
-
+pd.DataFrame(data).to_csv("data/youtube_data.csv", index=False)
+print("✅ YouTube auto-scraping completed")
